@@ -1,5 +1,14 @@
 # PBL-Perpustakaan — AI Agent Guide
 
+## Quick Reference — Most Common Tasks
+**Add new page:** Update `index.php` autoloader + switch case (with `break;`!) + create controller/model  
+**Build CSS:** `npm run watch:css` (dev auto-rebuild) or `npm run build:css` (production minified)  
+**Test features:** Use `temp/test_*.php` scripts (email, session, queries, etc.)  
+**Debug issues:** Check `temp/debug_*.php` and `temp/BUGFIX_*.md` for known solutions  
+**Implementation guides:** See `temp/IMPLEMENTASI_*.md` for feature patterns  
+**Routes:** `/index.php?page={controller}&action={method}` (e.g., `?page=booking&action=buat_booking`)  
+**AJAX endpoints (legacy):** `?page=booking&action=get_user_by_nim&nim={nim}` returns JSON  
+
 ## Quick Start Checklist
 Before making changes, verify:
 1. ✅ Apache + MySQL running in XAMPP control panel
@@ -190,6 +199,27 @@ The helper handles both XAMPP root deploys and subfolder deploys automatically.
 **Client:** `assets/js/captcha.js` refreshes image on click/button with cache-busting `?r=timestamp`  
 **Validation:** Controller compares `$_POST['captcha']` with `$_SESSION['code']` (case-insensitive)
 
+## AJAX Endpoints (Legacy — Avoid in New Code)
+**CRITICAL: Default to traditional form submissions with POST/GET. Only use AJAX for real-time features that absolutely require it.**
+
+**Existing AJAX endpoints:**
+- `?page=booking&action=get_user_by_nim&nim={nim}` — Returns JSON user data for NIM lookup
+  - Response: `{"success": bool, "data": {...}, "message": string}`
+  - Used in: `assets/js/booking.js` for adding booking participants
+- `?page=booking&action=get_booked_timeslots&id_ruangan={id}&tanggal={date}` — Returns JSON of booked time slots
+  - Response: `[{"kode_booking": string, "waktu_mulai": string, "waktu_selesai": string}, ...]`
+  - Used in: `assets/js/booking.js` for timeline conflict detection
+
+**When maintaining legacy AJAX:**
+- Keep existing pattern but refactor new features to avoid it
+- Use `header('Content-Type: application/json')` and `echo json_encode($response)`
+- Return consistent structure: `{"success": bool, "data": mixed, "message": string}`
+
+**Preferred patterns for new code:**
+- Form submissions with `window.location.href` for navigation
+- Server-side redirects with `header('Location: ...')`
+- JavaScript only for validation and UI interactions (no data fetching)
+
 ## Page Guards & Access Control
 **Admin protection:** `AdminController.__construct()` enforces role check:
 ```php
@@ -265,11 +295,17 @@ Controllers use typed properties (`private FeatureModel $model;`) and return typ
 - **Server:** Start Apache + MySQL via XAMPP control panel
 - **Access:** `http://localhost/` or `http://localhost/PBL%20Perpustakaan/` (subfolder auto-detected by `$asset()` helper)
 - **Database:** MySQL on `127.0.0.1`, DB: `PBL-Perpustakaan`, User: `root`, Pass: `admin`
-- **Git Branch:** Currently on `29-implementasi-booking` branch (feature branches follow numbered pattern)
+- **Git Workflow:** Feature branches follow numbered pattern (e.g., `29-implementasi-booking`)
 - **Debugging & Testing:**
   - **CRITICAL:** ALL debug files, experiments, and POCs MUST be placed in `temp/` folder
-  - Examples: `temp/debug_session.php`, `temp/test_query.php`, `temp/poc_feature.php`
-  - Documentation drafts also go in temp/ (e.g., `temp/IMPLEMENTASI_KELOLA_RUANGAN.md`)
+  - The `temp/` folder contains implementation notes and bugfix documentation for reference
+  - **temp/ folder structure:**
+    - `IMPLEMENTASI_*.md` — Feature implementation guides and patterns (e.g., `IMPLEMENTASI_KELOLA_RUANGAN.md`)
+    - `BUGFIX_*.md` — Bug fix documentation with solutions (e.g., `BUGFIX_MODAL_TIDAK_TERTUTUP.md`)
+    - `FIX_*.md` — Configuration fixes and guides (e.g., `FIX_EMAIL_SENDER_CONFIG.md`)
+    - `test_*.php` — Test/debug scripts for features (e.g., `test_email.php`, `test_validasi_email_pnj.php`)
+    - `debug_*.php` — Debug utilities (e.g., `debug_session.php`, `debug_tombol_selesai.php`)
+    - `*.sql` — Database migration scripts (e.g., `MIGRATION_PENGATURAN_SISTEM.sql`)
   - This keeps the main codebase clean and prevents accidental commits of debug code
   - Never create debug files in controller/, model/, or view/ directories
 
