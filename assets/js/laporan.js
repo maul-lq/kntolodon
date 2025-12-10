@@ -290,7 +290,8 @@ function showTab(tab) {
 }
 
 /**
- * Download laporan (placeholder - akan dikembangkan lebih lanjut)
+ * Download laporan ke format CSV (Excel-compatible)
+ * @param {string} periode - Periode laporan: harian, mingguan, bulanan, tahunan
  */
 function downloadLaporan(periode) {
     // Get current filters
@@ -308,11 +309,8 @@ function downloadLaporan(periode) {
     if (bulan) params.set('bulan', bulan);
     if (tahun) params.set('tahun', tahun);
     
-    // For now, just alert (implementation will be added later)
-    alert('Fitur download akan segera tersedia. Format: PDF/Excel untuk periode ' + periode);
-    
-    // TODO: Implement actual download functionality
-    // window.location.href = '?' + params.toString();
+    // Trigger download
+    window.location.href = '?' + params.toString();
 }
 
 // Expose functions to global scope

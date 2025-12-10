@@ -24,6 +24,7 @@
  * 
  * 3. LAPORAN (Reports & Analytics)
  *    - laporan() - Display reports page with filters
+ *    - download_laporan() - Export report to CSV/Excel
  * 
  * 4. BOOKING LIST (Booking Management)
  *    - booking_list() - List all bookings with check-in management
@@ -590,6 +591,182 @@ class AdminController
         $availableYears = $laporanModel->getAvailableYears();
         
         require __DIR__ . '/../view/admin/laporan.php';
+    }
+
+    /**
+     * Download laporan dalam format CSV (Excel-compatible)
+     * Supports 4 periode: harian, mingguan, bulanan, tahunan
+     */
+    public function download_laporan(): void
+    {
+        $laporanModel = new LaporanModel();
+        
+        // Ambil parameters
+        $periode = $_GET['periode'] ?? 'harian';
+        $tanggal = $_GET['tanggal'] ?? date('Y-m-d');
+        $bulan = $_GET['bulan'] ?? date('n');
+        $tahun = $_GET['tahun'] ?? date('Y');
+        
+        // Fetch data berdasarkan periode
+        $data = [];
+        $stats = [];
+        $filename = '';
+        
+        switch ($periode) {
+            case 'harian':
+                $data = $laporanModel->getDaily($tanggal);
+                $stats = $laporanModel->getDailyStats($tanggal);
+                $filename = 'Laporan_Harian_' . $tanggal . '.csv';
+                break;
+                
+            case 'mingguan':
+                $startDate = date('Y-m-d', strtotime('monday this week', strtotime($tanggal)));
+                $endDate = date('Y-m-d', strtotime($startDate . ' +6 days'));
+                $data = $laporanModel->getWeeklyDetail($startDate);
+                $stats = $laporanModel->getWeeklyStats($startDate);
+                $filename = 'Laporan_Mingguan_' . $startDate . '_to_' . $endDate . '.csv';
+                break;
+                
+            case 'bulanan':
+                $data = $laporanModel->getMonthlyDetail((int)$bulan, (int)$tahun);
+                $stats = $laporanModel->getMonthlyStats((int)$bulan, (int)$tahun);
+                $namaBulan = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                $filename = 'Laporan_Bulanan_' . $namaBulan[(int)$bulan] . '_' . $tahun . '.csv';
+                break;
+                
+            case 'tahunan':
+                $data = $laporanModel->getYearly((int)$tahun);
+                $stats = $laporanModel->getYearlyStats((int)$tahun);
+                $filename = 'Laporan_Tahunan_' . $tahun . '.csv';
+                break;
+        }
+        
+        // Set headers untuk download CSV
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        
+        // Open output stream
+        $output = fopen('php://output', 'w');
+        
+        // Add BOM untuk Excel UTF-8 support
+        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+        
+        // Generate CSV berdasarkan periode
+        switch ($periode) {
+            case 'harian':
+                // Header statistik
+                fputcsv($output, ['LAPORAN HARIAN - ' . date('d/m/Y', strtotime($tanggal))]);
+                fputcsv($output, ['Total Booking', $stats['total_booking'] ?? 0]);
+                fputcsv($output, ['Total Durasi (menit)', $stats['total_durasi'] ?? 0]);
+                fputcsv($output, ['Booking Selesai', $stats['booking_selesai'] ?? 0]);
+                fputcsv($output, ['Booking Batal', $stats['booking_batal'] ?? 0]);
+                fputcsv($output, []);
+                
+                // Header tabel
+                fputcsv($output, ['No', 'Ruangan', 'Waktu Booking', 'Nama Peminjam', 'Status', 'Total Booking']);
+                
+                // Data rows
+                $no = 1;
+                foreach ($data as $row) {
+                    $waktu = date('H:i', strtotime($row['waktu_mulai'])) . ' - ' . date('H:i', strtotime($row['waktu_selesai']));
+                    fputcsv($output, [
+                        $no++,
+                        $row['nama_ruangan'],
+                        $waktu,
+                        $row['nama_peminjam'] ?? '-',
+                        $row['nama_status'],
+                        $stats['total_booking'] ?? 0
+                    ]);
+                }
+                break;
+                
+            case 'mingguan':
+                $startDate = date('Y-m-d', strtotime('monday this week', strtotime($tanggal)));
+                $endDate = date('Y-m-d', strtotime($startDate . ' +6 days'));
+                
+                // Header statistik
+                fputcsv($output, ['LAPORAN MINGGUAN - ' . date('d/m/Y', strtotime($startDate)) . ' s/d ' . date('d/m/Y', strtotime($endDate))]);
+                fputcsv($output, ['Total Booking', $stats['total_booking'] ?? 0]);
+                fputcsv($output, ['Total Durasi (menit)', $stats['total_durasi'] ?? 0]);
+                fputcsv($output, ['Rata-rata Durasi (menit)', round($stats['rata_rata_durasi'] ?? 0, 2)]);
+                fputcsv($output, []);
+                
+                // Header tabel
+                fputcsv($output, ['No', 'Tanggal', 'Ruangan', 'Waktu Booking', 'Total Booking', 'Total Durasi (menit)']);
+                
+                // Data rows
+                $no = 1;
+                foreach ($data as $row) {
+                    $waktu = date('H:i', strtotime($row['waktu_mulai'])) . ' - ' . date('H:i', strtotime($row['waktu_selesai']));
+                    fputcsv($output, [
+                        $no++,
+                        date('d/m/Y', strtotime($row['tanggal_schedule'])),
+                        $row['nama_ruangan'],
+                        $waktu,
+                        $stats['total_booking'] ?? 0,
+                        $stats['total_durasi'] ?? 0
+                    ]);
+                }
+                break;
+                
+            case 'bulanan':
+                $namaBulan = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                
+                // Header statistik
+                fputcsv($output, ['LAPORAN BULANAN - ' . $namaBulan[(int)$bulan] . ' ' . $tahun]);
+                fputcsv($output, ['Total Booking', $stats['total_booking'] ?? 0]);
+                fputcsv($output, ['Total Durasi (menit)', $stats['total_durasi'] ?? 0]);
+                fputcsv($output, ['Rata-rata Durasi (menit)', round($stats['rata_rata_durasi'] ?? 0, 2)]);
+                fputcsv($output, []);
+                
+                // Header tabel
+                fputcsv($output, ['No', 'Tanggal', 'Ruangan', 'Waktu Booking', 'Nama Peminjam', 'Status', 'Total Booking Bulanan']);
+                
+                // Data rows
+                $no = 1;
+                foreach ($data as $row) {
+                    $waktu = date('H:i', strtotime($row['waktu_mulai'])) . ' - ' . date('H:i', strtotime($row['waktu_selesai']));
+                    fputcsv($output, [
+                        $no++,
+                        date('d/m/Y', strtotime($row['tanggal_schedule'])),
+                        $row['nama_ruangan'],
+                        $waktu,
+                        $row['nama_peminjam'] ?? '-',
+                        $row['nama_status'],
+                        $stats['total_booking'] ?? 0
+                    ]);
+                }
+                break;
+                
+            case 'tahunan':
+                // Header statistik
+                fputcsv($output, ['LAPORAN TAHUNAN - ' . $tahun]);
+                fputcsv($output, ['Total Booking', $stats['total_booking'] ?? 0]);
+                fputcsv($output, ['Total Durasi (menit)', $stats['total_durasi'] ?? 0]);
+                fputcsv($output, ['Rata-rata Durasi (menit)', round($stats['rata_rata_durasi'] ?? 0, 2)]);
+                fputcsv($output, []);
+                
+                // Header tabel
+                fputcsv($output, ['No', 'Bulan', 'Total Booking', 'Total Durasi (menit)']);
+                
+                // Data rows
+                $no = 1;
+                $namaBulan = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                foreach ($data as $row) {
+                    fputcsv($output, [
+                        $no++,
+                        $namaBulan[$row['bulan']] ?? 'Bulan ' . $row['bulan'],
+                        $row['jumlah_booking'],
+                        $row['total_durasi']
+                    ]);
+                }
+                break;
+        }
+        
+        fclose($output);
+        exit;
     }
 
     public function booking_list(): void
