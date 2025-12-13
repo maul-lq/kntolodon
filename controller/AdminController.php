@@ -641,11 +641,16 @@ class AdminController
                 break;
         }
         
-        // Set headers untuk download CSV
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Pragma: no-cache');
-        header('Expires: 0');
+        // Sanitize filename and set headers untuk download CSV
+        $filename = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', $filename);
+        $filename = substr($filename, 0, 200);
+
+        if (!headers_sent()) {
+            header('Content-Type: text/csv; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+            header('Pragma: no-cache');
+            header('Expires: 0');
+        }
         
         // Open output stream
         $output = fopen('php://output', 'w');
@@ -664,20 +669,20 @@ class AdminController
                 fputcsv($output, ['Booking Batal', $stats['booking_batal'] ?? 0]);
                 fputcsv($output, []);
                 
-                // Header tabel
-                fputcsv($output, ['No', 'Ruangan', 'Waktu Booking', 'Nama Peminjam', 'Status', 'Total Booking']);
-                
+                // Header tabel (per-booking details)
+                fputcsv($output, ['No', 'Ruangan', 'Waktu Booking', 'Nama Peminjam', 'Status', 'Durasi (menit)']);
+
                 // Data rows
                 $no = 1;
                 foreach ($data as $row) {
                     $waktu = date('H:i', strtotime($row['waktu_mulai'])) . ' - ' . date('H:i', strtotime($row['waktu_selesai']));
                     fputcsv($output, [
                         $no++,
-                        $row['nama_ruangan'],
+                        $row['nama_ruangan'] ?? '-',
                         $waktu,
                         $row['nama_peminjam'] ?? '-',
-                        $row['nama_status'],
-                        $stats['total_booking'] ?? 0
+                        $row['nama_status'] ?? '-',
+                        $row['durasi_penggunaan'] ?? 0
                     ]);
                 }
                 break;
@@ -693,9 +698,9 @@ class AdminController
                 fputcsv($output, ['Rata-rata Durasi (menit)', round($stats['rata_rata_durasi'] ?? 0, 2)]);
                 fputcsv($output, []);
                 
-                // Header tabel
-                fputcsv($output, ['No', 'Tanggal', 'Ruangan', 'Waktu Booking', 'Total Booking', 'Total Durasi (menit)']);
-                
+                // Header tabel (per-booking details for the week)
+                fputcsv($output, ['No', 'Tanggal', 'Ruangan', 'Waktu Booking', 'Nama Peminjam', 'Status', 'Durasi (menit)']);
+
                 // Data rows
                 $no = 1;
                 foreach ($data as $row) {
@@ -703,10 +708,11 @@ class AdminController
                     fputcsv($output, [
                         $no++,
                         date('d/m/Y', strtotime($row['tanggal_schedule'])),
-                        $row['nama_ruangan'],
+                        $row['nama_ruangan'] ?? '-',
                         $waktu,
-                        $stats['total_booking'] ?? 0,
-                        $stats['total_durasi'] ?? 0
+                        $row['nama_peminjam'] ?? '-',
+                        $row['nama_status'] ?? '-',
+                        $row['durasi_penggunaan'] ?? 0
                     ]);
                 }
                 break;
@@ -721,9 +727,9 @@ class AdminController
                 fputcsv($output, ['Rata-rata Durasi (menit)', round($stats['rata_rata_durasi'] ?? 0, 2)]);
                 fputcsv($output, []);
                 
-                // Header tabel
-                fputcsv($output, ['No', 'Tanggal', 'Ruangan', 'Waktu Booking', 'Nama Peminjam', 'Status', 'Total Booking Bulanan']);
-                
+                // Header tabel (per-booking details for the month)
+                fputcsv($output, ['No', 'Tanggal', 'Ruangan', 'Waktu Booking', 'Nama Peminjam', 'Status', 'Durasi (menit)']);
+
                 // Data rows
                 $no = 1;
                 foreach ($data as $row) {
@@ -731,11 +737,11 @@ class AdminController
                     fputcsv($output, [
                         $no++,
                         date('d/m/Y', strtotime($row['tanggal_schedule'])),
-                        $row['nama_ruangan'],
+                        $row['nama_ruangan'] ?? '-',
                         $waktu,
                         $row['nama_peminjam'] ?? '-',
-                        $row['nama_status'],
-                        $stats['total_booking'] ?? 0
+                        $row['nama_status'] ?? '-',
+                        $row['durasi_penggunaan'] ?? 0
                     ]);
                 }
                 break;
