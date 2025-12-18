@@ -352,6 +352,12 @@ class BookingController
             exit;
         }
 
+        if ($durasi > 180)
+        {
+            echo "<script>alert('Durasi booking maksimal 180 menit (3 jam)'); window.location.href='index.php?page=booking&room=" . $id_ruangan . "';</script>";
+            exit;
+        }
+
         // Validasi kapasitas (ketua + anggota)
         $total_peserta = 1; // ketua
         $valid_anggota = [];
